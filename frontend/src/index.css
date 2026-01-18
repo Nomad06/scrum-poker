@@ -1,0 +1,258 @@
+/* Google Fonts: Rye (Western display) + Lora (readable body) */
+@import url('https://fonts.googleapis.com/css2?family=Rye&family=Lora:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+/* Western Theme Custom Properties */
+:root {
+  /* Desert color palette */
+  --color-sand-50: #fefcf3;
+  --color-sand-100: #fdf8e1;
+  --color-sand-200: #faefc3;
+  --color-sand-300: #f5e199;
+  --color-sand-400: #eecf6e;
+  --color-sand-500: #e7ba47;
+  --color-sand-600: #d9a02d;
+  --color-sand-700: #b67f24;
+  --color-sand-800: #946524;
+  --color-sand-900: #7a5322;
+
+  --color-leather-50: #fdf6f3;
+  --color-leather-100: #fbeae4;
+  --color-leather-200: #f8d5c8;
+  --color-leather-300: #f2b5a1;
+  --color-leather-400: #e98a6e;
+  --color-leather-500: #dd6847;
+  --color-leather-600: #c94d30;
+  --color-leather-700: #a83e26;
+  --color-leather-800: #8b3624;
+  --color-leather-900: #733123;
+
+  --color-wood-50: #faf6f1;
+  --color-wood-100: #f2e9dc;
+  --color-wood-200: #e4d1b9;
+  --color-wood-300: #d3b38e;
+  --color-wood-400: #c29466;
+  --color-wood-500: #b57c4c;
+  --color-wood-600: #a46840;
+  --color-wood-700: #885438;
+  --color-wood-800: #6f4532;
+  --color-wood-900: #5b3a2b;
+
+  --color-cactus-50: #f4f9f4;
+  --color-cactus-100: #e6f2e6;
+  --color-cactus-200: #cde5ce;
+  --color-cactus-300: #a6d0a8;
+  --color-cactus-400: #77b37b;
+  --color-cactus-500: #539658;
+  --color-cactus-600: #407a45;
+  --color-cactus-700: #356139;
+  --color-cactus-800: #2d4e30;
+  --color-cactus-900: #264129;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Lora', Georgia, serif;
+  background: linear-gradient(180deg, var(--color-sand-200) 0%, var(--color-sand-400) 50%, var(--color-leather-600) 100%);
+  min-height: 100vh;
+  color: var(--color-wood-900);
+}
+
+h1, h2, h3, .western-title {
+  font-family: 'Rye', serif;
+  letter-spacing: 0.02em;
+}
+
+/* Custom theme for Tailwind */
+@theme {
+  --color-sand-50: #fefcf3;
+  --color-sand-100: #fdf8e1;
+  --color-sand-200: #faefc3;
+  --color-sand-300: #f5e199;
+  --color-sand-400: #eecf6e;
+  --color-sand-500: #e7ba47;
+  --color-sand-600: #d9a02d;
+  --color-sand-700: #b67f24;
+  --color-sand-800: #946524;
+  --color-sand-900: #7a5322;
+
+  --color-leather-50: #fdf6f3;
+  --color-leather-100: #fbeae4;
+  --color-leather-200: #f8d5c8;
+  --color-leather-300: #f2b5a1;
+  --color-leather-400: #e98a6e;
+  --color-leather-500: #dd6847;
+  --color-leather-600: #c94d30;
+  --color-leather-700: #a83e26;
+  --color-leather-800: #8b3624;
+  --color-leather-900: #733123;
+
+  --color-wood-50: #faf6f1;
+  --color-wood-100: #f2e9dc;
+  --color-wood-200: #e4d1b9;
+  --color-wood-300: #d3b38e;
+  --color-wood-400: #c29466;
+  --color-wood-500: #b57c4c;
+  --color-wood-600: #a46840;
+  --color-wood-700: #885438;
+  --color-wood-800: #6f4532;
+  --color-wood-900: #5b3a2b;
+
+  --color-cactus-50: #f4f9f4;
+  --color-cactus-100: #e6f2e6;
+  --color-cactus-200: #cde5ce;
+  --color-cactus-300: #a6d0a8;
+  --color-cactus-400: #77b37b;
+  --color-cactus-500: #539658;
+  --color-cactus-600: #407a45;
+  --color-cactus-700: #356139;
+  --color-cactus-800: #2d4e30;
+  --color-cactus-900: #264129;
+
+  --font-family-display: 'Rye', serif;
+  --font-family-body: 'Lora', Georgia, serif;
+}
+
+/* Utility classes */
+.text-shadow-western {
+  text-shadow: 2px 2px 4px rgba(91, 58, 43, 0.3);
+}
+
+.border-rope {
+  border: 3px solid var(--color-wood-600);
+  border-image: repeating-linear-gradient(
+    45deg,
+    var(--color-wood-500),
+    var(--color-wood-500) 2px,
+    var(--color-wood-700) 2px,
+    var(--color-wood-700) 4px
+  ) 3;
+}
+
+/* Wanted poster style */
+.wanted-poster {
+  background: var(--color-sand-100);
+  border: 4px solid var(--color-wood-700);
+  box-shadow:
+    inset 0 0 20px rgba(139, 54, 36, 0.1),
+    4px 4px 8px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.wanted-poster::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 80%, rgba(139, 54, 36, 0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(139, 54, 36, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* Weathered paper texture */
+.paper-texture {
+  background-color: var(--color-sand-100);
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+/* Card styling */
+.poker-card {
+  background: linear-gradient(135deg, #f8f4e8 0%, #e8e0c8 100%);
+  border: 2px solid var(--color-wood-600);
+  border-radius: 8px;
+  box-shadow:
+    2px 2px 4px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.poker-card-back {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      var(--color-leather-700),
+      var(--color-leather-700) 2px,
+      var(--color-leather-800) 2px,
+      var(--color-leather-800) 4px
+    );
+  border: 3px solid var(--color-wood-800);
+  border-radius: 8px;
+}
+
+/* Button styling */
+.btn-western {
+  font-family: 'Rye', serif;
+  background: linear-gradient(180deg, var(--color-leather-500) 0%, var(--color-leather-700) 100%);
+  color: var(--color-sand-100);
+  border: 3px solid var(--color-wood-800);
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  box-shadow:
+    2px 2px 0 var(--color-wood-900),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.btn-western:hover {
+  transform: translate(-1px, -1px);
+  box-shadow:
+    3px 3px 0 var(--color-wood-900),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-western:active {
+  transform: translate(1px, 1px);
+  box-shadow:
+    1px 1px 0 var(--color-wood-900),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Input styling */
+.input-western {
+  font-family: 'Lora', Georgia, serif;
+  background: var(--color-sand-100);
+  border: 2px solid var(--color-wood-600);
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  color: var(--color-wood-900);
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.input-western:focus {
+  outline: none;
+  border-color: var(--color-leather-600);
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.1),
+    0 0 0 2px rgba(201, 77, 48, 0.2);
+}
+
+/* Saloon door animation */
+@keyframes saloon-swing {
+  0%, 100% { transform: rotateY(0deg); }
+  25% { transform: rotateY(-15deg); }
+  75% { transform: rotateY(15deg); }
+}
+
+/* Dust particle animation */
+@keyframes dust-float {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  100% {
+    transform: translateY(-100px) translateX(20px);
+    opacity: 0;
+  }
+}
+
+.dust-particle {
+  animation: dust-float 8s ease-in-out infinite;
+}
