@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/poker/backend/internal/game"
 	"github.com/poker/backend/internal/handler"
+	"github.com/poker/backend/internal/middleware"
 )
 
 func main() {
@@ -37,6 +38,7 @@ func main() {
 
 	// Routes
 	api := r.Group("/api")
+	api.Use(middleware.RateLimitMiddleware(10, 20)) // 10 requests/sec, burst 20
 	{
 		api.GET("/health", roomHandler.HealthCheck)
 		api.GET("/stats", roomHandler.GetStats)

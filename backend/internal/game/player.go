@@ -5,6 +5,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/poker/backend/internal/models"
+	"golang.org/x/time/rate"
 )
 
 // Avatars available for players
@@ -19,29 +20,31 @@ var Avatars = []string{
 	"bounty-hunter",
 }
 
-// Player represents a connected player
+// Player represents a connected user
 type Player struct {
-	ID       string
-	Name     string
-	Avatar   string
-	Conn     *websocket.Conn
-	Room     *Room
-	HasVoted bool
-	Vote     string
-	IsHost   bool
-	mu       sync.Mutex
+	ID          string
+	Name        string
+	Avatar      string
+	IsHost      bool
+	Vote        string
+	HasVoted    bool
+	Conn        *websocket.Conn
+	Room        *Room
+	mu          sync.RWMutex
+	RateLimiter *rate.Limiter
 }
 
 // NewPlayer creates a new player
 func NewPlayer(id, name, avatar string, conn *websocket.Conn, isHost bool) *Player {
 	return &Player{
-		ID:       id,
-		Name:     name,
-		Avatar:   avatar,
-		Conn:     conn,
-		HasVoted: false,
-		Vote:     "",
-		IsHost:   isHost,
+		ID:          id,
+		Name:        name,
+		Avatar:      avatar,
+		Conn:        conn,
+		HasVoted:    false,
+		Vote:        "",
+		IsHost:      isHost,
+		RateLimiter: rate.NewLimiter(5, 10), // 5 messages/sec, burst 10
 	}
 }
 

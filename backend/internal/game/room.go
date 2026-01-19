@@ -62,10 +62,16 @@ func NewRoomWithScale(code string, expiryHours int, scaleType models.VotingScale
 	}
 }
 
+const MaxPlayers = 30
+
 // AddPlayer adds a player to the room
-func (r *Room) AddPlayer(player *Player) {
+func (r *Room) AddPlayer(player *Player) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if len(r.Players) >= MaxPlayers {
+		return false
+	}
 
 	// Assign avatar
 	player.Avatar = r.assignAvatar()
@@ -79,6 +85,8 @@ func (r *Room) AddPlayer(player *Player) {
 	r.Players[player.ID] = player
 	player.Room = r
 	r.LastActive = time.Now()
+
+	return true
 }
 
 // RemovePlayer removes a player from the room

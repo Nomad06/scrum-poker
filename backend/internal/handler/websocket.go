@@ -55,7 +55,12 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 	playerID := uuid.New().String()
 	player := game.NewPlayer(playerID, playerName, "", conn, false)
 
-	room.AddPlayer(player)
+	if !room.AddPlayer(player) {
+		log.Printf("Room %s is full, rejecting player %s", roomCode, playerName)
+		conn.WriteJSON(gin.H{"type": "error", "error": "room is full"})
+		conn.Close()
+		return
+	}
 	log.Printf("Player %s (%s) joined room %s", playerName, playerID, roomCode)
 
 	// Send initial state to player
@@ -77,6 +82,9 @@ func (h *WebSocketHandler) handleMessages(player *game.Player, room *game.Room) 
 		h.handleDisconnect(player, room)
 	}()
 
+	// Set read limit to prevent massive messages
+	player.Conn.SetReadLimit(512 * 1024) // 512 KB
+
 	for {
 		var msg models.ClientMessage
 		err := player.Conn.ReadJSON(&msg)
@@ -85,6 +93,17 @@ func (h *WebSocketHandler) handleMessages(player *game.Player, room *game.Room) 
 				log.Printf("WebSocket error: %v", err)
 			}
 			break
+		}
+
+		// Rate limit check
+		if !player.RateLimiter.Allow() {
+			log.Printf("Rate limit exceeded for player %s", player.Name)
+			// Optional: enable this if you want to notify the client
+			// player.SendMessage(&models.ServerMessage{
+			// 	Type:  models.MsgTypeError,
+			// 	Error: "rate limit exceeded",
+			// })
+			continue
 		}
 
 		h.processMessage(player, room, &msg)

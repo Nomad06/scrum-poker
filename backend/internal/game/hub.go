@@ -11,15 +11,18 @@ import (
 	"github.com/poker/backend/internal/models"
 )
 
-const emptyRoomGracePeriod = 30 * time.Second
+const (
+	emptyRoomGracePeriod = 30 * time.Second
+	MaxRooms             = 1000
+)
 
 // Hub manages all rooms and connections
 type Hub struct {
-	Rooms          map[string]*Room
-	DefaultExpiry  int // hours
-	mu             sync.RWMutex
-	cleanupTicker  *time.Ticker
-	done           chan struct{}
+	Rooms         map[string]*Room
+	DefaultExpiry int // hours
+	mu            sync.RWMutex
+	cleanupTicker *time.Ticker
+	done          chan struct{}
 }
 
 // NewHub creates a new hub
@@ -46,6 +49,11 @@ func (h *Hub) CreateRoom(expiryHours int) *Room {
 func (h *Hub) CreateRoomWithScale(expiryHours int, scaleType models.VotingScaleType) *Room {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
+	if len(h.Rooms) >= MaxRooms {
+		log.Printf("Max rooms reached (%d), rejecting creation", MaxRooms)
+		return nil
+	}
 
 	if expiryHours <= 0 {
 		expiryHours = h.DefaultExpiry
