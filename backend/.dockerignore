@@ -1,0 +1,22 @@
+# Ignore test files and outputs
+*_test.go
+coverage.out
+*.test
+
+# Ignore built binaries
+server
+
+# Ignore git and other version control
+.git/
+.gitignore
+
+# Ignore fly.io local files
+.fly/
+
+# Ignore local development files
+.env
+.env.local
+
+# Ignore documentation
+*.md
+!README.md

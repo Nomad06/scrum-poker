@@ -13,9 +13,14 @@ import type { RoomState, VotingResult, Player, TimerState } from '../types';
 
 export function Room() {
   const { code } = useParams<{ code: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const playerName = searchParams.get('name') || 'Anonymous';
+  const nameFromUrl = searchParams.get('name');
+
+  const [showNameModal, setShowNameModal] = useState(!nameFromUrl);
+  const [nameInput, setNameInput] = useState('');
+  const [nameError, setNameError] = useState('');
+  const playerName = nameFromUrl || 'Anonymous';
 
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [selectedVote, setSelectedVote] = useState<string | null>(null);
@@ -125,9 +130,27 @@ export function Room() {
     setTimerAutoReveal(false);
   }, []);
 
+  // Handle name submission from modal
+  const handleNameSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = nameInput.trim();
+    if (!trimmedName) {
+      setNameError('Please enter your name');
+      return;
+    }
+    if (trimmedName.length > 20) {
+      setNameError('Name must be 20 characters or less');
+      return;
+    }
+    // Update URL with name parameter
+    setSearchParams({ name: trimmedName });
+    setShowNameModal(false);
+  };
+
   const { isConnected, isConnecting, vote, reveal, reset, startTimer, stopTimer } = useWebSocket({
     roomCode: code || '',
     playerName,
+    enabled: !showNameModal, // Don't connect until name is provided
     onStateSync: handleStateSync,
     onPlayerJoined: handlePlayerJoined,
     onPlayerLeft: handlePlayerLeft,
@@ -236,6 +259,60 @@ export function Room() {
     return null;
   }
 
+  // Show name modal if no name provided
+  if (showNameModal) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="wanted-poster rounded-lg p-8 max-w-md w-full"
+        >
+          <h1 className="text-2xl text-wood-800 text-center mb-6">
+            🤠 Join the Poker Room
+          </h1>
+          <p className="text-wood-600 text-center mb-6">
+            Enter your name to join room <code className="bg-sand-300 px-2 py-1 rounded font-mono">{code}</code>
+          </p>
+          <form onSubmit={handleNameSubmit}>
+            <div className="mb-4">
+              <input
+                type="text"
+                value={nameInput}
+                onChange={(e) => {
+                  setNameInput(e.target.value);
+                  setNameError('');
+                }}
+                placeholder="Your name"
+                className="w-full px-4 py-3 border-2 border-wood-400 rounded-lg bg-sand-100 text-wood-800 placeholder-wood-400 focus:outline-none focus:border-leather-500"
+                autoFocus
+                maxLength={20}
+              />
+              {nameError && (
+                <p className="text-leather-600 text-sm mt-2">{nameError}</p>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="flex-1 px-4 py-3 border-2 border-wood-400 rounded-lg text-wood-600 hover:bg-sand-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 btn-western"
+              >
+                Join Room
+              </button>
+            </div>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
+
   // Check if there's a strong consensus for celebration
   const showCelebration = revealed && votingResult && (() => {
     const votes = Object.values(votingResult.votes);
@@ -245,8 +322,21 @@ export function Room() {
     return votes.length > 1 && (maxCount / votes.length) >= 0.8;
   })();
 
+  // Standoff state: Everyone has voted but not revealed yet (The "Good, Bad, Ugly" moment)
+  const isStandoff = !revealed && (roomState?.players.length || 0) > 1 && (roomState?.players.every(p => p.hasVoted) || false);
+
   return (
-    <div className="min-h-screen p-4 md:p-8 relative">
+    <div className="min-h-screen p-4 md:p-8 relative transition-colors duration-1000">
+      {/* Standoff Overlay - Vignette and Sepia tone */}
+      <div
+        className={`fixed inset-0 pointer-events-none z-0 transition-opacity duration-1000 ${isStandoff ? 'opacity-100' : 'opacity-0'}`}
+      >
+        {/* Vignette */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_50%,rgba(0,0,0,0.4)_120%)]" />
+        {/* Sepia/Heat effect */}
+        <div className="absolute inset-0 bg-yellow-900/10 mix-blend-overlay" />
+      </div>
+
       {/* Ambient particles */}
       <AmbientParticles count={12} showSparkles={showCelebration || false} />
 
@@ -349,6 +439,7 @@ export function Room() {
                   player={currentPlayer}
                   isCurrentPlayer={true}
                   revealed={revealed}
+                  isSuspicious={isStandoff}
                 />
               )}
               {/* Other players */}
@@ -357,6 +448,7 @@ export function Room() {
                   key={player.id}
                   player={player}
                   revealed={revealed}
+                  isSuspicious={isStandoff}
                 />
               ))}
             </AnimatePresence>
@@ -573,7 +665,12 @@ export function Room() {
           {!isHost && !revealed && (
             <div className="text-wood-600 italic flex items-center gap-2">
               <span>Waiting for the host to reveal...</span>
-              {allVoted && <span className="text-cactus-600">All votes are in!</span>}
+              {allVoted && (
+                <div className="flex flex-col items-center">
+                  <span className="text-cactus-600 font-bold animate-pulse">All votes are in!</span>
+                  {isStandoff && <span className="text-xs text-wood-500 font-serif italic mt-1 min-h-[1.5em]" style={{ fontFamily: "'Rye', serif" }}>It's High Noon...</span>}
+                </div>
+              )}
             </div>
           )}
 

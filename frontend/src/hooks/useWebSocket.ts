@@ -1,9 +1,11 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { ServerMessage, ClientMessage, RoomState, VotingResult, Player, TimerState } from '../types';
+import { buildApiUrl, buildWsUrl } from '../config/api';
 
 interface UseWebSocketOptions {
   roomCode: string;
   playerName: string;
+  enabled?: boolean; // Whether to connect (default: true)
   onStateSync: (state: RoomState) => void;
   onPlayerJoined: (player: Player) => void;
   onPlayerLeft: (playerId: string, newHostId: string) => void;
@@ -20,6 +22,7 @@ interface UseWebSocketOptions {
 export function useWebSocket({
   roomCode,
   playerName,
+  enabled = true,
   onStateSync,
   onPlayerJoined,
   onPlayerLeft,
@@ -70,7 +73,7 @@ export function useWebSocket({
   // Check if room exists before attempting reconnection
   const checkRoomExists = useCallback(async (): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/rooms/${roomCode}/check`);
+      const response = await fetch(buildApiUrl(`api/rooms/${roomCode}/check`));
       return response.ok;
     } catch {
       return false;
@@ -145,8 +148,7 @@ export function useWebSocket({
       return;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws?room=${roomCode}&name=${encodeURIComponent(playerName)}`;
+    const wsUrl = buildWsUrl(`ws?room=${roomCode}&name=${encodeURIComponent(playerName)}`);
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -233,12 +235,14 @@ export function useWebSocket({
 
   useEffect(() => {
     isMountedRef.current = true;
-    connect();
+    if (enabled) {
+      connect();
+    }
     return () => {
       isMountedRef.current = false;
       disconnect();
     };
-  }, [roomCode, playerName]); // Only reconnect when room or player changes
+  }, [roomCode, playerName, enabled]); // Only reconnect when room, player, or enabled changes
 
   return {
     isConnected,

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PRESET_SCALES, type VotingScaleType } from '../types';
+import { buildApiUrl } from '../config/api';
 
 export function Home() {
   const navigate = useNavigate();
@@ -23,7 +24,7 @@ export function Home() {
     setError('');
 
     try {
-      const response = await fetch('/api/rooms', {
+      const response = await fetch(buildApiUrl('api/rooms'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scale: selectedScale }),
@@ -53,7 +54,7 @@ export function Home() {
     setError('');
 
     try {
-      const response = await fetch(`/api/rooms/${joinCode.toUpperCase()}/check`);
+      const response = await fetch(buildApiUrl(`api/rooms/${joinCode.toUpperCase()}/check`));
       const data = await response.json();
 
       if (!data.exists) {

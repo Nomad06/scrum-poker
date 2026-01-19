@@ -3,13 +3,15 @@ import { CowboyAvatar } from './CowboyAvatar';
 import { PlayerVoteCard } from './VotingCard';
 import type { Player } from '../types';
 
+// ... existing imports
 interface PlayerCardProps {
   player: Player;
   isCurrentPlayer?: boolean;
   revealed?: boolean;
+  isSuspicious?: boolean;
 }
 
-export function PlayerCard({ player, isCurrentPlayer = false, revealed = false }: PlayerCardProps) {
+export function PlayerCard({ player, isCurrentPlayer = false, revealed = false, isSuspicious = false }: PlayerCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.8, y: 20 }}
@@ -26,6 +28,7 @@ export function PlayerCard({ player, isCurrentPlayer = false, revealed = false }
         size="md"
         hasVoted={player.hasVoted}
         isVoting={!player.hasVoted && !revealed}
+        isSuspicious={isSuspicious}
       />
 
       {/* Name and role */}

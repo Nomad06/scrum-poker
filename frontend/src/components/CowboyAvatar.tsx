@@ -7,6 +7,7 @@ interface CowboyAvatarProps {
   isVoting?: boolean;
   hasVoted?: boolean;
   isCelebrating?: boolean; // New prop for celebration animation
+  isSuspicious?: boolean; // New prop for standoff moment
 }
 
 // Western color schemes for different characters
@@ -27,7 +28,7 @@ const sizeClasses = {
   lg: 'w-28 h-28',
 };
 
-export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = false, isCelebrating = false }: CowboyAvatarProps) {
+export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = false, isCelebrating = false, isSuspicious = false }: CowboyAvatarProps) {
   // Extract base type (remove any suffix like "-123")
   const baseType = type.split('-')[0];
   const colors = avatarColors[baseType] || avatarColors.sheriff;
@@ -70,6 +71,14 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
     voted: {
       x: 0,
     },
+    suspicious: {
+      x: [-4, 4, -4],
+      transition: {
+        duration: 1.5,
+        repeat: Infinity,
+        ease: 'easeInOut',
+      },
+    },
     celebrating: {
       x: 0,
       y: [0, -2, 0],
@@ -83,6 +92,7 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
   // Hat tip animation when voted
   const hatVariants: Variants = {
     idle: { rotate: 0, y: 0 },
+    suspicious: { rotate: 0, y: 1 }, // Hat pulled down slightly
     voting: { rotate: [-2, 2, -2], transition: { duration: 0.5, repeat: Infinity } },
     voted: {
       rotate: [0, -10, 0],
@@ -102,6 +112,7 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
   // Body bounce for celebration
   const bodyVariants: Variants = {
     idle: { y: 0 },
+    suspicious: { y: 0 },
     voting: { y: 0 },
     voted: { y: 0 },
     celebrating: {
@@ -113,7 +124,7 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
     },
   };
 
-  const animationState = isCelebrating ? 'celebrating' : hasVoted ? 'voted' : isVoting ? 'voting' : 'idle';
+  const animationState = isCelebrating ? 'celebrating' : isVoting ? 'voting' : isSuspicious ? 'suspicious' : hasVoted ? 'voted' : 'idle';
 
   return (
     <motion.div className={`${sizeClasses[size]} relative`} variants={bodyVariants} animate={animationState}>
@@ -160,32 +171,32 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
         {/* Eyes container */}
         <motion.g variants={eyeVariants} animate={animationState}>
           {/* Left eye */}
-          <ellipse cx="40" cy="52" rx="6" ry={isBlinking ? 1 : 4} fill="white" />
+          <ellipse cx="40" cy="52" rx="6" ry={isBlinking ? 1 : (isSuspicious ? 2 : 4)} fill="white" />
           {!isBlinking && (
             <>
-              <circle cx="41" cy="52" r="2.5" fill="#3d2314" />
-              <circle cx="42" cy="51" r="1" fill="white" />
+              <circle cx={isSuspicious ? 39 : 41} cy="52" r={isSuspicious ? 1.5 : 2.5} fill="#3d2314" />
+              {!isSuspicious && <circle cx="42" cy="51" r="1" fill="white" />}
             </>
           )}
 
           {/* Right eye */}
-          <ellipse cx="60" cy="52" rx="6" ry={isBlinking ? 1 : 4} fill="white" />
+          <ellipse cx="60" cy="52" rx="6" ry={isBlinking ? 1 : (isSuspicious ? 2 : 4)} fill="white" />
           {!isBlinking && (
             <>
-              <circle cx="61" cy="52" r="2.5" fill="#3d2314" />
-              <circle cx="62" cy="51" r="1" fill="white" />
+              <circle cx={isSuspicious ? 59 : 61} cy="52" r={isSuspicious ? 1.5 : 2.5} fill="#3d2314" />
+              {!isSuspicious && <circle cx="62" cy="51" r="1" fill="white" />}
             </>
           )}
 
           {/* Eyebrows - raised when celebrating */}
           <path
-            d={isCelebrating ? "M 33 44 Q 40 41 47 44" : "M 33 47 Q 40 44 47 47"}
+            d={isCelebrating ? "M 33 44 Q 40 41 47 44" : isSuspicious ? "M 33 49 Q 40 50 47 49" : "M 33 47 Q 40 44 47 47"}
             stroke="#5c4033"
             strokeWidth="2"
             fill="none"
           />
           <path
-            d={isCelebrating ? "M 53 44 Q 60 41 67 44" : "M 53 47 Q 60 44 67 47"}
+            d={isCelebrating ? "M 53 44 Q 60 41 67 44" : isSuspicious ? "M 53 49 Q 60 50 67 49" : "M 53 47 Q 60 44 67 47"}
             stroke="#5c4033"
             strokeWidth="2"
             fill="none"

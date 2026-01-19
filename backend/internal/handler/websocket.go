@@ -63,14 +63,15 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 	}
 	log.Printf("Player %s (%s) joined room %s", playerName, playerID, roomCode)
 
-	// Send initial state to player
+	// Send initial state to the joining player
 	h.sendState(player, room)
 
-	// Notify others
-	room.BroadcastExcept(&models.ServerMessage{
-		Type:    models.MsgTypePlayerJoin,
-		Payload: player.ToModel(false),
-	}, playerID)
+	// Send full state sync to all other players (ensures consistency, avoids race conditions)
+	for _, p := range room.Players {
+		if p.ID != playerID {
+			h.sendState(p, room)
+		}
+	}
 
 	// Handle messages
 	go h.handleMessages(player, room)
@@ -204,14 +205,10 @@ func (h *WebSocketHandler) handleDisconnect(player *game.Player, room *game.Room
 
 	log.Printf("Player %s left room %s", player.Name, room.Code)
 
-	// Notify remaining players
-	room.Broadcast(&models.ServerMessage{
-		Type: models.MsgTypePlayerLeft,
-		Payload: map[string]interface{}{
-			"playerId":  player.ID,
-			"newHostId": room.HostID,
-		},
-	})
+	// Send full state sync to all remaining players (ensures consistency)
+	for _, p := range room.Players {
+		h.sendState(p, room)
+	}
 
 	// Schedule cleanup for empty rooms (with grace period for reconnection)
 	if room.IsEmpty() {
