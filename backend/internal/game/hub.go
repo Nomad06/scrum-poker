@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/poker/backend/internal/models"
 )
 
 const emptyRoomGracePeriod = 30 * time.Second
@@ -37,6 +39,11 @@ func NewHub(defaultExpiryHours int) *Hub {
 
 // CreateRoom creates a new room with a unique code
 func (h *Hub) CreateRoom(expiryHours int) *Room {
+	return h.CreateRoomWithScale(expiryHours, models.ScaleFibonacci)
+}
+
+// CreateRoomWithScale creates a new room with a specific voting scale
+func (h *Hub) CreateRoomWithScale(expiryHours int, scaleType models.VotingScaleType) *Room {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -45,10 +52,10 @@ func (h *Hub) CreateRoom(expiryHours int) *Room {
 	}
 
 	code := h.generateRoomCode()
-	room := NewRoom(code, expiryHours)
+	room := NewRoomWithScale(code, expiryHours, scaleType)
 	h.Rooms[code] = room
 
-	log.Printf("Room created: %s (expires in %d hours)", code, expiryHours)
+	log.Printf("Room created: %s (expires in %d hours, scale: %s)", code, expiryHours, scaleType)
 	return room
 }
 

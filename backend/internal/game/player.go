@@ -75,6 +75,11 @@ func (p *Player) ResetVote() {
 
 // SetVote sets the player's vote
 func (p *Player) SetVote(vote string) {
-	p.Vote = vote
-	p.HasVoted = true
+	if vote == "" {
+		p.Vote = ""
+		p.HasVoted = false
+	} else {
+		p.Vote = vote
+		p.HasVoted = true
+	}
 }

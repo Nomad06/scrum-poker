@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/poker/backend/internal/game"
+	"github.com/poker/backend/internal/models"
 )
 
 // RoomHandler handles room-related HTTP requests
@@ -18,6 +20,11 @@ func NewRoomHandler(hub *game.Hub) *RoomHandler {
 	return &RoomHandler{hub: hub}
 }
 
+// CreateRoomRequest represents the request body for room creation
+type CreateRoomRequest struct {
+	Scale string `json:"scale"`
+}
+
 // CreateRoom creates a new room
 func (h *RoomHandler) CreateRoom(c *gin.Context) {
 	// Parse optional expiry hours from query
@@ -27,11 +34,38 @@ func (h *RoomHandler) CreateRoom(c *gin.Context) {
 		expiryHours = 24
 	}
 
-	room := h.hub.CreateRoom(expiryHours)
+	// Parse optional scale from body or query
+	var req CreateRoomRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("JSON parse (may be empty): %v", err)
+	}
+
+	scaleType := c.DefaultQuery("scale", req.Scale)
+	if scaleType == "" {
+		scaleType = string(models.ScaleFibonacci)
+	}
+
+	log.Printf("Creating room with scale: '%s' (from body: '%s')", scaleType, req.Scale)
+
+	room := h.hub.CreateRoomWithScale(expiryHours, models.VotingScaleType(scaleType))
+
+	log.Printf("Room created: %s with scale: %v", room.Code, room.Scale)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"code":        room.Code,
 		"expiryHours": room.ExpiryHours,
+		"scale":       room.Scale,
+	})
+}
+
+// GetScales returns available voting scales
+func (h *RoomHandler) GetScales(c *gin.Context) {
+	scales := make([]models.VotingScale, 0, len(models.PresetScales))
+	for _, scale := range models.PresetScales {
+		scales = append(scales, scale)
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"scales": scales,
 	})
 }
 
@@ -49,6 +83,7 @@ func (h *RoomHandler) GetRoom(c *gin.Context) {
 		"code":        room.Code,
 		"playerCount": room.PlayerCount(),
 		"expiryHours": room.ExpiryHours,
+		"scale":       room.GetScale(),
 	})
 }
 

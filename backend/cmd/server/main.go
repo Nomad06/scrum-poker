@@ -40,6 +40,7 @@ func main() {
 	{
 		api.GET("/health", roomHandler.HealthCheck)
 		api.GET("/stats", roomHandler.GetStats)
+		api.GET("/scales", roomHandler.GetScales)
 
 		// Room routes
 		api.POST("/rooms", roomHandler.CreateRoom)

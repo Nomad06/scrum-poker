@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { PRESET_SCALES, type VotingScaleType } from '../types';
 
 export function Home() {
   const navigate = useNavigate();
   const [joinCode, setJoinCode] = useState('');
   const [playerName, setPlayerName] = useState('');
+  const [selectedScale, setSelectedScale] = useState<VotingScaleType>('fibonacci');
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState('');
@@ -21,7 +23,11 @@ export function Home() {
     setError('');
 
     try {
-      const response = await fetch('/api/rooms', { method: 'POST' });
+      const response = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scale: selectedScale }),
+      });
       if (!response.ok) throw new Error('Failed to create room');
 
       const data = await response.json();
@@ -169,6 +175,35 @@ export function Home() {
                 maxLength={20}
                 onKeyDown={(e) => e.key === 'Enter' && createRoom()}
               />
+            </div>
+
+            <div>
+              <label className="block text-wood-700 mb-2 font-semibold">
+                Voting Scale
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {(Object.keys(PRESET_SCALES) as VotingScaleType[])
+                  .filter((key) => key !== 'custom')
+                  .map((scaleType) => (
+                    <button
+                      key={scaleType}
+                      onClick={() => setSelectedScale(scaleType)}
+                      className={`
+                        p-2 rounded-lg border-2 text-sm font-medium transition-all
+                        ${
+                          selectedScale === scaleType
+                            ? 'border-leather-500 bg-leather-100 text-leather-800'
+                            : 'border-wood-300 bg-sand-100 text-wood-700 hover:border-wood-400'
+                        }
+                      `}
+                    >
+                      <div className="font-bold">{PRESET_SCALES[scaleType].name}</div>
+                      <div className="text-xs mt-1 opacity-70 truncate">
+                        {PRESET_SCALES[scaleType].values.slice(0, 4).join(', ')}...
+                      </div>
+                    </button>
+                  ))}
+              </div>
             </div>
 
             <button

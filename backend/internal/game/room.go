@@ -11,19 +11,25 @@ import (
 
 // Room represents a poker planning room
 type Room struct {
-	Code       string
-	Players    map[string]*Player
-	Revealed   bool
-	HostID     string
-	CreatedAt  time.Time
-	LastActive time.Time
-	ExpiryHours int
-	mu         sync.RWMutex
-	usedAvatars map[string]bool
+	Code            string
+	Players         map[string]*Player
+	Revealed        bool
+	HostID          string
+	CreatedAt       time.Time
+	LastActive      time.Time
+	ExpiryHours     int
+	Scale           *models.VotingScale
+	TimerEndTime    *time.Time
+	TimerAutoReveal bool
+	timerCancel     chan struct{}
+	mu              sync.RWMutex
+	usedAvatars     map[string]bool
 }
 
 // NewRoom creates a new room with the given code
 func NewRoom(code string, expiryHours int) *Room {
+	// Default to Fibonacci scale
+	defaultScale := models.PresetScales[models.ScaleFibonacci]
 	return &Room{
 		Code:        code,
 		Players:     make(map[string]*Player),
@@ -31,6 +37,27 @@ func NewRoom(code string, expiryHours int) *Room {
 		CreatedAt:   time.Now(),
 		LastActive:  time.Now(),
 		ExpiryHours: expiryHours,
+		Scale:       &defaultScale,
+		usedAvatars: make(map[string]bool),
+	}
+}
+
+// NewRoomWithScale creates a new room with a specific voting scale
+func NewRoomWithScale(code string, expiryHours int, scaleType models.VotingScaleType) *Room {
+	// Get the requested scale, default to Fibonacci if not found
+	scale, ok := models.PresetScales[scaleType]
+	if !ok {
+		scale = models.PresetScales[models.ScaleFibonacci]
+	}
+
+	return &Room{
+		Code:        code,
+		Players:     make(map[string]*Player),
+		Revealed:    false,
+		CreatedAt:   time.Now(),
+		LastActive:  time.Now(),
+		ExpiryHours: expiryHours,
+		Scale:       &scale,
 		usedAvatars: make(map[string]bool),
 	}
 }
@@ -147,13 +174,23 @@ func (r *Room) GetState(forPlayerID string) *models.RoomState {
 		players = append(players, p.ToModel(r.Revealed))
 	}
 
-	return &models.RoomState{
+	state := &models.RoomState{
 		Code:            r.Code,
 		Players:         players,
 		Revealed:        r.Revealed,
 		CurrentPlayerID: forPlayerID,
 		HostID:          r.HostID,
+		Scale:           r.Scale,
+		TimerAutoReveal: r.TimerAutoReveal,
 	}
+
+	// Include timer end time if active
+	if r.TimerEndTime != nil && r.TimerEndTime.After(time.Now()) {
+		endTimeMs := r.TimerEndTime.UnixMilli()
+		state.TimerEndTime = &endTimeMs
+	}
+
+	return state
 }
 
 // IsEmpty returns true if the room has no players
@@ -229,4 +266,79 @@ func (r *Room) PlayerCount() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return len(r.Players)
+}
+
+// StartTimer starts a voting timer (host only)
+func (r *Room) StartTimer(playerID string, durationSec int, autoReveal bool) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Only host can start timer
+	if r.HostID != playerID {
+		return false
+	}
+
+	// Cancel any existing timer
+	if r.timerCancel != nil {
+		close(r.timerCancel)
+	}
+
+	endTime := time.Now().Add(time.Duration(durationSec) * time.Second)
+	r.TimerEndTime = &endTime
+	r.TimerAutoReveal = autoReveal
+	r.timerCancel = make(chan struct{})
+	r.LastActive = time.Now()
+
+	return true
+}
+
+// StopTimer stops the current timer (host only)
+func (r *Room) StopTimer(playerID string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Only host can stop timer
+	if r.HostID != playerID {
+		return false
+	}
+
+	if r.timerCancel != nil {
+		close(r.timerCancel)
+		r.timerCancel = nil
+	}
+	r.TimerEndTime = nil
+	r.TimerAutoReveal = false
+	r.LastActive = time.Now()
+
+	return true
+}
+
+// GetTimerCancel returns the timer cancel channel
+func (r *Room) GetTimerCancel() <-chan struct{} {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.timerCancel
+}
+
+// ClearTimer clears the timer state (used after timer ends)
+func (r *Room) ClearTimer() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.TimerEndTime = nil
+	r.timerCancel = nil
+}
+
+// GetScale returns the room's voting scale
+func (r *Room) GetScale() *models.VotingScale {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.Scale
+}
+
+// SetScale sets the room's voting scale
+func (r *Room) SetScale(scale *models.VotingScale) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.Scale = scale
+	r.LastActive = time.Now()
 }

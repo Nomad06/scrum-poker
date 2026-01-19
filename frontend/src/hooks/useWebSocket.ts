@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import type { ServerMessage, ClientMessage, RoomState, VotingResult, Player } from '../types';
+import type { ServerMessage, ClientMessage, RoomState, VotingResult, Player, TimerState } from '../types';
 
 interface UseWebSocketOptions {
   roomCode: string;
@@ -7,11 +7,15 @@ interface UseWebSocketOptions {
   onStateSync: (state: RoomState) => void;
   onPlayerJoined: (player: Player) => void;
   onPlayerLeft: (playerId: string, newHostId: string) => void;
-  onVoted: (playerId: string) => void;
+  onVoted: (playerId: string, hasVoted: boolean) => void;
   onRevealed: (result: VotingResult) => void;
   onError: (error: string) => void;
   onRoomNotFound?: () => void;
+  onTimerSync?: (timer: TimerState) => void;
+  onTimerEnd?: () => void;
 }
+
+
 
 export function useWebSocket({
   roomCode,
@@ -23,6 +27,8 @@ export function useWebSocket({
   onRevealed,
   onError,
   onRoomNotFound,
+  onTimerSync,
+  onTimerEnd,
 }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -42,6 +48,8 @@ export function useWebSocket({
     onRevealed,
     onError,
     onRoomNotFound,
+    onTimerSync,
+    onTimerEnd,
   });
 
   // Update callbacks ref when they change
@@ -54,8 +62,10 @@ export function useWebSocket({
       onRevealed,
       onError,
       onRoomNotFound,
+      onTimerSync,
+      onTimerEnd,
     };
-  }, [onStateSync, onPlayerJoined, onPlayerLeft, onVoted, onRevealed, onError, onRoomNotFound]);
+  }, [onStateSync, onPlayerJoined, onPlayerLeft, onVoted, onRevealed, onError, onRoomNotFound, onTimerSync, onTimerEnd]);
 
   // Check if room exists before attempting reconnection
   const checkRoomExists = useCallback(async (): Promise<boolean> => {
@@ -85,13 +95,21 @@ export function useWebSocket({
       }
 
       case 'voted': {
-        const payload = message.payload as { playerId: string };
-        callbacks.onVoted(payload.playerId);
+        const payload = message.payload as { playerId: string; hasVoted?: boolean };
+        callbacks.onVoted(payload.playerId, payload.hasVoted ?? true);
         break;
       }
 
       case 'revealed':
         callbacks.onRevealed(message.payload as VotingResult);
+        break;
+
+      case 'timer_sync':
+        callbacks.onTimerSync?.(message.payload as TimerState);
+        break;
+
+      case 'timer_end':
+        callbacks.onTimerEnd?.();
         break;
 
       case 'error':
@@ -196,6 +214,17 @@ export function useWebSocket({
     sendMessage({ type: 'reset' });
   }, [sendMessage]);
 
+  const startTimer = useCallback(
+    (duration: number, autoReveal: boolean) => {
+      sendMessage({ type: 'start_timer', timerDuration: duration, autoReveal });
+    },
+    [sendMessage]
+  );
+
+  const stopTimer = useCallback(() => {
+    sendMessage({ type: 'stop_timer' });
+  }, [sendMessage]);
+
   const disconnect = useCallback(() => {
     reconnectAttempts.current = maxReconnectAttempts; // Prevent reconnection
     wsRef.current?.close();
@@ -217,6 +246,8 @@ export function useWebSocket({
     vote,
     reveal,
     reset,
+    startTimer,
+    stopTimer,
     disconnect,
   };
 }

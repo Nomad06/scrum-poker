@@ -1,10 +1,12 @@
 import { motion, type Variants } from 'framer-motion';
+import { useEffect, useState } from 'react';
 
 interface CowboyAvatarProps {
   type: string;
   size?: 'sm' | 'md' | 'lg';
   isVoting?: boolean;
   hasVoted?: boolean;
+  isCelebrating?: boolean; // New prop for celebration animation
 }
 
 // Western color schemes for different characters
@@ -25,10 +27,27 @@ const sizeClasses = {
   lg: 'w-28 h-28',
 };
 
-export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = false }: CowboyAvatarProps) {
+export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = false, isCelebrating = false }: CowboyAvatarProps) {
   // Extract base type (remove any suffix like "-123")
   const baseType = type.split('-')[0];
   const colors = avatarColors[baseType] || avatarColors.sheriff;
+
+  // Random blink effect
+  const [isBlinking, setIsBlinking] = useState(false);
+
+  useEffect(() => {
+    const blink = () => {
+      setIsBlinking(true);
+      setTimeout(() => setIsBlinking(false), 150);
+    };
+
+    // Random blink every 3-6 seconds
+    const interval = setInterval(() => {
+      if (Math.random() > 0.5) blink();
+    }, 3000 + Math.random() * 3000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Idle animation - subtle looking around
   const eyeVariants: Variants = {
@@ -51,6 +70,14 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
     voted: {
       x: 0,
     },
+    celebrating: {
+      x: 0,
+      y: [0, -2, 0],
+      transition: {
+        duration: 0.3,
+        repeat: 3,
+      },
+    },
   };
 
   // Hat tip animation when voted
@@ -62,12 +89,34 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
       y: [0, -3, 0],
       transition: { duration: 0.5 },
     },
+    celebrating: {
+      rotate: [0, -15, 0, 15, 0],
+      y: [0, -8, 0, -8, 0],
+      transition: {
+        duration: 0.6,
+        repeat: 2,
+      },
+    },
   };
 
-  const animationState = hasVoted ? 'voted' : isVoting ? 'voting' : 'idle';
+  // Body bounce for celebration
+  const bodyVariants: Variants = {
+    idle: { y: 0 },
+    voting: { y: 0 },
+    voted: { y: 0 },
+    celebrating: {
+      y: [0, -5, 0],
+      transition: {
+        duration: 0.3,
+        repeat: 4,
+      },
+    },
+  };
+
+  const animationState = isCelebrating ? 'celebrating' : hasVoted ? 'voted' : isVoting ? 'voting' : 'idle';
 
   return (
-    <motion.div className={`${sizeClasses[size]} relative`}>
+    <motion.div className={`${sizeClasses[size]} relative`} variants={bodyVariants} animate={animationState}>
       <svg viewBox="0 0 100 100" className="w-full h-full">
         {/* Face */}
         <ellipse cx="50" cy="58" rx="28" ry="32" fill={colors.face} />
@@ -111,25 +160,46 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
         {/* Eyes container */}
         <motion.g variants={eyeVariants} animate={animationState}>
           {/* Left eye */}
-          <ellipse cx="40" cy="52" rx="6" ry="4" fill="white" />
-          <circle cx="41" cy="52" r="2.5" fill="#3d2314" />
-          <circle cx="42" cy="51" r="1" fill="white" />
+          <ellipse cx="40" cy="52" rx="6" ry={isBlinking ? 1 : 4} fill="white" />
+          {!isBlinking && (
+            <>
+              <circle cx="41" cy="52" r="2.5" fill="#3d2314" />
+              <circle cx="42" cy="51" r="1" fill="white" />
+            </>
+          )}
 
           {/* Right eye */}
-          <ellipse cx="60" cy="52" rx="6" ry="4" fill="white" />
-          <circle cx="61" cy="52" r="2.5" fill="#3d2314" />
-          <circle cx="62" cy="51" r="1" fill="white" />
+          <ellipse cx="60" cy="52" rx="6" ry={isBlinking ? 1 : 4} fill="white" />
+          {!isBlinking && (
+            <>
+              <circle cx="61" cy="52" r="2.5" fill="#3d2314" />
+              <circle cx="62" cy="51" r="1" fill="white" />
+            </>
+          )}
 
-          {/* Eyebrows */}
-          <path d="M 33 47 Q 40 44 47 47" stroke="#5c4033" strokeWidth="2" fill="none" />
-          <path d="M 53 47 Q 60 44 67 47" stroke="#5c4033" strokeWidth="2" fill="none" />
+          {/* Eyebrows - raised when celebrating */}
+          <path
+            d={isCelebrating ? "M 33 44 Q 40 41 47 44" : "M 33 47 Q 40 44 47 47"}
+            stroke="#5c4033"
+            strokeWidth="2"
+            fill="none"
+          />
+          <path
+            d={isCelebrating ? "M 53 44 Q 60 41 67 44" : "M 53 47 Q 60 44 67 47"}
+            stroke="#5c4033"
+            strokeWidth="2"
+            fill="none"
+          />
         </motion.g>
 
         {/* Nose */}
         <ellipse cx="50" cy="60" rx="4" ry="3" fill={`${colors.face}dd`} />
 
         {/* Mouth */}
-        {hasVoted ? (
+        {isCelebrating ? (
+          // Big smile when celebrating
+          <path d="M 40 66 Q 50 78 60 66" stroke="#5c4033" strokeWidth="2" fill="none" />
+        ) : hasVoted ? (
           // Slight smirk when voted
           <path d="M 43 68 Q 50 73 57 68" stroke="#5c4033" strokeWidth="2" fill="none" />
         ) : (
