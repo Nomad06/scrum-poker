@@ -16,6 +16,7 @@ func main() {
 	// Configuration from environment
 	port := getEnv("PORT", "8080")
 	defaultExpiry, _ := strconv.Atoi(getEnv("DEFAULT_ROOM_EXPIRY_HOURS", "24"))
+	allowedOrigins := getEnv("ALLOWED_ORIGINS", "*")
 
 	// Create hub
 	hub := game.NewHub(defaultExpiry)
@@ -29,11 +30,24 @@ func main() {
 	r := gin.Default()
 
 	// CORS configuration
+	var origins []string
+	if allowedOrigins == "*" {
+		origins = []string{"*"}
+	} else {
+		origins = []string{
+			"https://scrum-poker.pages.dev",     // Your Cloudflare Pages domain
+			"https://*.pages.dev",               // Cloudflare Pages preview domains
+			"http://localhost:5173",             // Local development
+			"http://localhost:3000",             // Alternative local port
+		}
+	}
+
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOrigins:     origins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
 		AllowCredentials: true,
+		AllowWebSockets:  true,
 	}))
 
 	// Routes
