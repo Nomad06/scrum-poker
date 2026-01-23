@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import type { ServerMessage, ClientMessage, RoomState, VotingResult, Player, TimerState } from '../types';
+import type { ServerMessage, ClientMessage, RoomState, VotingResult, Player, TimerState, JiraIssue } from '../types';
 import { buildApiUrl, buildWsUrl } from '../config/api';
 
 interface UseWebSocketOptions {
@@ -15,9 +15,8 @@ interface UseWebSocketOptions {
   onRoomNotFound?: () => void;
   onTimerSync?: (timer: TimerState) => void;
   onTimerEnd?: () => void;
+  onSetIssue?: (issue: JiraIssue) => void;
 }
-
-
 
 export function useWebSocket({
   roomCode,
@@ -32,15 +31,16 @@ export function useWebSocket({
   onRoomNotFound,
   onTimerSync,
   onTimerEnd,
+  onSetIssue,
 }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const reconnectAttempts = useRef(0);
+
+  // Reconnection state
+  const [retryCount, setRetryCount] = useState(0);
   const maxReconnectAttempts = 5;
-  const roomNotFoundRef = useRef(false);
-  const isConnectingRef = useRef(false);
-  const isMountedRef = useRef(false);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Store callbacks in refs to avoid dependency changes
   const callbacksRef = useRef({
@@ -53,6 +53,7 @@ export function useWebSocket({
     onRoomNotFound,
     onTimerSync,
     onTimerEnd,
+    onSetIssue,
   });
 
   // Update callbacks ref when they change
@@ -67,133 +68,133 @@ export function useWebSocket({
       onRoomNotFound,
       onTimerSync,
       onTimerEnd,
+      onSetIssue,
     };
-  }, [onStateSync, onPlayerJoined, onPlayerLeft, onVoted, onRevealed, onError, onRoomNotFound, onTimerSync, onTimerEnd]);
+  }, [onStateSync, onPlayerJoined, onPlayerLeft, onVoted, onRevealed, onError, onRoomNotFound, onTimerSync, onTimerEnd, onSetIssue]);
 
-  // Check if room exists before attempting reconnection
-  const checkRoomExists = useCallback(async (): Promise<boolean> => {
-    try {
-      const response = await fetch(buildApiUrl(`api/rooms/${roomCode}/check`));
-      return response.ok;
-    } catch {
-      return false;
-    }
-  }, [roomCode]);
+  // Handle connection
+  useEffect(() => {
+    if (!enabled || !roomCode || !playerName) return;
 
-  const handleMessage = useCallback((message: ServerMessage) => {
-    const callbacks = callbacksRef.current;
-    switch (message.type) {
-      case 'sync':
-        callbacks.onStateSync(message.payload as RoomState);
-        break;
+    let isMounted = true;
+    let ws: WebSocket | null = null;
 
-      case 'player_joined':
-        callbacks.onPlayerJoined(message.payload as Player);
-        break;
-
-      case 'player_left': {
-        const payload = message.payload as { playerId: string; newHostId: string };
-        callbacks.onPlayerLeft(payload.playerId, payload.newHostId);
-        break;
-      }
-
-      case 'voted': {
-        const payload = message.payload as { playerId: string; hasVoted?: boolean };
-        callbacks.onVoted(payload.playerId, payload.hasVoted ?? true);
-        break;
-      }
-
-      case 'revealed':
-        callbacks.onRevealed(message.payload as VotingResult);
-        break;
-
-      case 'timer_sync':
-        callbacks.onTimerSync?.(message.payload as TimerState);
-        break;
-
-      case 'timer_end':
-        callbacks.onTimerEnd?.();
-        break;
-
-      case 'error':
-        callbacks.onError(message.error || 'Unknown error');
-        break;
-    }
-  }, []);
-
-  const connect = useCallback(async () => {
-    // Prevent duplicate connections - check ref FIRST before any async work
-    if (isConnectingRef.current) return;
-    if (wsRef.current) return; // Already have a connection (open or connecting)
-    if (roomNotFoundRef.current) return;
-
-    // Set flag immediately before any async work
-    isConnectingRef.current = true;
-    setIsConnecting(true);
-
-    // Check if room exists before connecting
-    const exists = await checkRoomExists();
-    if (!exists) {
-      setIsConnecting(false);
-      isConnectingRef.current = false;
-      roomNotFoundRef.current = true;
-      callbacksRef.current.onRoomNotFound?.();
-      return;
-    }
-
-    // Double-check we haven't been superseded
-    if (wsRef.current) {
-      isConnectingRef.current = false;
-      setIsConnecting(false);
-      return;
-    }
-
-    const wsUrl = buildWsUrl(`ws?room=${roomCode}&name=${encodeURIComponent(playerName)}`);
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setIsConnected(true);
-      setIsConnecting(false);
-      isConnectingRef.current = false;
-      reconnectAttempts.current = 0;
-    };
-
-    ws.onclose = () => {
-      // Only process if this is still our active connection
-      if (wsRef.current !== ws) return;
-
-      wsRef.current = null;
-      setIsConnected(false);
-      setIsConnecting(false);
-      isConnectingRef.current = false;
-
-      // Don't reconnect if room was not found or component unmounted
-      if (roomNotFoundRef.current) return;
-      if (!isMountedRef.current) return;
-
-      // Attempt to reconnect
-      if (reconnectAttempts.current < maxReconnectAttempts) {
-        reconnectAttempts.current += 1;
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);
-        setTimeout(connect, delay);
-      }
-    };
-
-    ws.onerror = () => {
-      callbacksRef.current.onError('Connection error. Retrying...');
-    };
-
-    ws.onmessage = (event) => {
+    const connect = async () => {
+      // Check room existence first
       try {
-        const message: ServerMessage = JSON.parse(event.data);
-        handleMessage(message);
-      } catch (e) {
-        console.error('Failed to parse message:', e);
+        const checkRes = await fetch(buildApiUrl(`api/rooms/${roomCode}/check`));
+        if (!checkRes.ok) throw new Error('Room check failed');
+        const data = await checkRes.json();
+        if (!data.exists) {
+          if (isMounted) callbacksRef.current.onRoomNotFound?.();
+          return;
+        }
+      } catch {
+        // If check fails (e.g. network), try to connect anyway or handle error
+        // But for now let's proceed to connect or fail
       }
+
+      if (!isMounted) return;
+
+      setIsConnecting(true);
+
+      // Get host token if exists
+      const hostToken = localStorage.getItem(`scrum_poker_token_${roomCode}`);
+      const queryParams = new URLSearchParams({
+        room: roomCode,
+        name: playerName,
+      });
+      if (hostToken) {
+        queryParams.append('hostToken', hostToken);
+      }
+
+      const wsUrl = buildWsUrl(`ws?${queryParams.toString()}`);
+      ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        if (isMounted) {
+          setIsConnected(true);
+          setIsConnecting(false);
+          setRetryCount(0); // Reset retry count on success
+        }
+      };
+
+      ws.onclose = () => {
+        if (isMounted) {
+          setIsConnected(false);
+          setIsConnecting(false);
+          wsRef.current = null;
+
+          // Schedule retry if not maxed out
+          if (retryCount < maxReconnectAttempts) {
+            const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+            retryTimeoutRef.current = setTimeout(() => {
+              setRetryCount(prev => prev + 1);
+            }, delay);
+          }
+        }
+      };
+
+      ws.onerror = () => {
+        if (isMounted) {
+          callbacksRef.current.onError('Connection error. Retrying...');
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message: ServerMessage = JSON.parse(event.data);
+          const callbacks = callbacksRef.current;
+
+          switch (message.type) {
+            case 'sync':
+              callbacks.onStateSync(message.payload as RoomState);
+              break;
+            case 'player_joined':
+              callbacks.onPlayerJoined(message.payload as Player);
+              break;
+            case 'player_left': {
+              const payload = message.payload as { playerId: string; newHostId: string };
+              callbacks.onPlayerLeft(payload.playerId, payload.newHostId);
+              break;
+            }
+            case 'voted': {
+              const payload = message.payload as { playerId: string; hasVoted?: boolean };
+              callbacks.onVoted(payload.playerId, payload.hasVoted ?? true);
+              break;
+            }
+            case 'revealed':
+              callbacks.onRevealed(message.payload as VotingResult);
+              break;
+            case 'timer_sync':
+              callbacks.onTimerSync?.(message.payload as TimerState);
+              break;
+            case 'timer_end':
+              callbacks.onTimerEnd?.();
+              break;
+            case 'set_issue':
+              callbacks.onSetIssue?.(message.payload as unknown as JiraIssue);
+              break;
+            case 'error':
+              callbacks.onError(message.error || 'Unknown error');
+              break;
+          }
+        } catch (e) {
+          console.error('Failed to parse message:', e);
+        }
+      };
     };
-  }, [roomCode, playerName, checkRoomExists, handleMessage]);
+
+    connect();
+
+    return () => {
+      isMounted = false;
+      if (ws) ws.close();
+      wsRef.current = null;
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+    };
+  }, [roomCode, playerName, enabled, retryCount]); // Depend on retryCount to trigger re-effect
 
   const sendMessage = useCallback((message: ClientMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -227,22 +228,9 @@ export function useWebSocket({
     sendMessage({ type: 'stop_timer' });
   }, [sendMessage]);
 
-  const disconnect = useCallback(() => {
-    reconnectAttempts.current = maxReconnectAttempts; // Prevent reconnection
-    wsRef.current?.close();
-    wsRef.current = null;
-  }, []);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    if (enabled) {
-      connect();
-    }
-    return () => {
-      isMountedRef.current = false;
-      disconnect();
-    };
-  }, [roomCode, playerName, enabled]); // Only reconnect when room, player, or enabled changes
+  const setIssue = useCallback((issue: JiraIssue) => {
+    sendMessage({ type: 'set_issue', issue });
+  }, [sendMessage]);
 
   return {
     isConnected,
@@ -252,6 +240,6 @@ export function useWebSocket({
     reset,
     startTimer,
     stopTimer,
-    disconnect,
+    setIssue,
   };
 }

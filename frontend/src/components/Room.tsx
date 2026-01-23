@@ -8,8 +8,10 @@ import { CowboyAvatar } from './CowboyAvatar';
 import { Timer } from './Timer';
 import { KeyboardShortcuts } from './KeyboardShortcuts';
 import { AmbientParticles } from './AmbientParticles';
+import { JiraSearchModal } from './JiraSearchModal';
 import { VOTING_VALUES } from '../types';
 import type { RoomState, VotingResult, Player, TimerState } from '../types';
+import { buildApiUrl } from '../config/api';
 
 export function Room() {
   const { code } = useParams<{ code: string }>();
@@ -30,6 +32,11 @@ export function Room() {
   const [timerEndTime, setTimerEndTime] = useState<number | null>(null);
   const [timerAutoReveal, setTimerAutoReveal] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Jira state
+  const [showJiraModal, setShowJiraModal] = useState(false);
+  const [isSavingToJira, setIsSavingToJira] = useState(false);
+  const currentIssue = roomState?.currentIssue;
 
   // Handlers for WebSocket events
   const handleStateSync = useCallback((state: RoomState) => {
@@ -147,7 +154,7 @@ export function Room() {
     setShowNameModal(false);
   };
 
-  const { isConnected, isConnecting, vote, reveal, reset, startTimer, stopTimer } = useWebSocket({
+  const { isConnected, isConnecting, vote, reveal, reset, startTimer, stopTimer, setIssue } = useWebSocket({
     roomCode: code || '',
     playerName,
     enabled: !showNameModal, // Don't connect until name is provided
@@ -160,6 +167,10 @@ export function Room() {
     onRoomNotFound: handleRoomNotFound,
     onTimerSync: handleTimerSync,
     onTimerEnd: handleTimerEnd,
+    onSetIssue: (issue) => {
+      // We rely on state sync, but logging here could be useful
+      console.log('Issue set:', issue.key);
+    }
   });
 
   // Handle voting
@@ -313,13 +324,21 @@ export function Room() {
     );
   }
 
-  // Check if there's a strong consensus for celebration
-  const showCelebration = revealed && votingResult && (() => {
+  // Calculate stats for celebration and firing
+  const { isFullConsensus } = (() => {
+    if (!revealed || !votingResult) return { isFullConsensus: false };
+
     const votes = Object.values(votingResult.votes);
+    if (votes.length < 2) return { isFullConsensus: false }; // Need at least 2 votes
+
     const voteCount: Record<string, number> = {};
     votes.forEach(v => { voteCount[v] = (voteCount[v] || 0) + 1; });
     const maxCount = Math.max(...Object.values(voteCount));
-    return votes.length > 1 && (maxCount / votes.length) >= 0.8;
+    const ratio = maxCount / votes.length;
+
+    return {
+      isFullConsensus: ratio === 1
+    };
   })();
 
   // Standoff state: Everyone has voted but not revealed yet (The "Good, Bad, Ugly" moment)
@@ -338,7 +357,7 @@ export function Room() {
       </div>
 
       {/* Ambient particles */}
-      <AmbientParticles count={12} showSparkles={showCelebration || false} />
+      <AmbientParticles count={12} showSparkles={false} />
 
       {/* Header */}
       <header className="max-w-6xl mx-auto mb-8">
@@ -403,6 +422,15 @@ export function Room() {
             >
               Leave Room
             </button>
+
+            {isHost && (
+              <button
+                onClick={() => setShowJiraModal(true)}
+                className="btn-western text-sm py-1 px-3"
+              >
+                {currentIssue ? 'Change Issue' : 'Select Issue'}
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -423,8 +451,48 @@ export function Room() {
         )}
       </AnimatePresence>
 
+      {/* Jira Search Modal */}
+      <JiraSearchModal
+        isOpen={showJiraModal}
+        onClose={() => setShowJiraModal(false)}
+        onSelect={(issue) => {
+          setIssue(issue);
+          setShowJiraModal(false);
+          // Optional: clear votes if new issue?
+          // reset(); 
+        }}
+      />
+
       {/* Main content */}
       <main className="max-w-6xl mx-auto">
+        {/* Current Issue Banner */}
+        {currentIssue && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 wanted-poster p-4 flex items-center justify-between gap-4 border-l-8 border-wood-800"
+          >
+            <div>
+              <div className="text-xs font-bold text-wood-500 uppercase tracking-widest mb-1">Wanted Issue</div>
+              <div className="flex items-baseline gap-3">
+                <span className="text-2xl font-mono font-bold text-wood-900">{currentIssue.key}</span>
+                <span className="text-lg text-wood-700">{currentIssue.summary}</span>
+              </div>
+            </div>
+            {isHost && (
+              <button
+                onClick={() => setShowJiraModal(true)}
+                className="text-wood-500 hover:text-wood-800 p-2"
+                title="Change Issue"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            )}
+          </motion.div>
+        )}
+
         {/* Players area */}
         <section className="mb-8">
           <h2 className="text-xl text-wood-700 mb-4 flex items-center gap-2">
@@ -440,6 +508,7 @@ export function Room() {
                   isCurrentPlayer={true}
                   revealed={revealed}
                   isSuspicious={isStandoff}
+                  isFiring={isFullConsensus}
                 />
               )}
               {/* Other players */}
@@ -449,6 +518,7 @@ export function Room() {
                   player={player}
                   revealed={revealed}
                   isSuspicious={isStandoff}
+                  isFiring={isFullConsensus}
                 />
               ))}
             </AnimatePresence>
@@ -596,6 +666,56 @@ export function Room() {
                     })}
                   </div>
                 </div>
+
+                {isHost && revealed && currentIssue && (
+                  <div className="mt-6 flex justify-center border-t border-wood-300 pt-6">
+                    <div className="flex items-center gap-4">
+                      <span className="text-wood-700 font-semibold">Save Estimate to Jira:</span>
+                      <div className="flex gap-2">
+                        {(() => {
+                          const votes = Object.values(votingResult.votes).filter(v => v !== '?');
+                          const voteCount: Record<string, number> = {};
+                          votes.forEach(v => { voteCount[v] = (voteCount[v] || 0) + 1; });
+                          const maxCount = Math.max(...Object.values(voteCount));
+                          const modeVotes = Object.entries(voteCount)
+                            .filter(([, c]) => c === maxCount)
+                            .map(([v]) => v);
+
+                          const suggestions = Array.from(new Set([
+                            ...modeVotes,
+                            votingResult.average ? Math.round(votingResult.average).toString() : null
+                          ])).filter(Boolean) as string[];
+
+                          return suggestions.map(val => (
+                            <button
+                              key={val}
+                              onClick={async () => {
+                                setIsSavingToJira(true);
+                                try {
+                                  const res = await fetch(buildApiUrl(`api/jira/issue/${currentIssue.key}/estimate`), {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ points: parseFloat(val) })
+                                  });
+                                  if (!res.ok) throw new Error();
+                                  setError(`Saved ${val} points to ${currentIssue.key}!`); // Success message disguised as error for visibility or make a toast?
+                                } catch (e) {
+                                  setError('Failed to save to Jira');
+                                } finally {
+                                  setIsSavingToJira(false);
+                                }
+                              }}
+                              disabled={isSavingToJira}
+                              className="bg-cactus-600 text-white px-4 py-2 rounded hover:bg-cactus-700 disabled:opacity-50 font-bold"
+                            >
+                              {val}
+                            </button>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.section>
           )}

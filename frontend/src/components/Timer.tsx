@@ -21,24 +21,31 @@ export function Timer({ endTime, autoReveal, isHost, onStartTimer, onStopTimer }
   const [showControls, setShowControls] = useState(false);
   const [selectedDuration, setSelectedDuration] = useState(60);
   const [selectedAutoReveal, setSelectedAutoReveal] = useState(true);
+  const [totalDuration, setTotalDuration] = useState(60);
 
-  // Calculate time left
+  // Calculate time left and duration
   useEffect(() => {
     if (!endTime) {
-      setTimeLeft(0);
+      setTimeLeft(0); // eslint-disable-line react-hooks/set-state-in-effect
       return;
     }
 
+    // Determine duration when timer starts or updates
+    const now = Date.now();
+    const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
+    const calculatedDuration = Math.max(selectedDuration, remaining);
+    setTotalDuration((prev) => (Math.abs(prev - calculatedDuration) > 5 ? calculatedDuration : prev)); // eslint-disable-line react-hooks/set-state-in-effect
+
     const updateTimeLeft = () => {
-      const now = Date.now();
-      const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
-      setTimeLeft(remaining);
+      const currentNow = Date.now();
+      const currentRemaining = Math.max(0, Math.ceil((endTime - currentNow) / 1000));
+      setTimeLeft(currentRemaining);
     };
 
     updateTimeLeft();
     const interval = setInterval(updateTimeLeft, 100);
     return () => clearInterval(interval);
-  }, [endTime]);
+  }, [endTime, selectedDuration]);
 
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -117,7 +124,7 @@ export function Timer({ endTime, autoReveal, isHost, onStartTimer, onStopTimer }
                     strokeWidth="6"
                     strokeLinecap="round"
                     strokeDasharray={`${2 * Math.PI * 38}`}
-                    strokeDashoffset={2 * Math.PI * 38 * (1 - timeLeft / (endTime ? (endTime - Date.now() + timeLeft * 1000) / 1000 : selectedDuration))}
+                    strokeDashoffset={2 * Math.PI * 38 * (1 - timeLeft / totalDuration)}
                     transform="rotate(-90 50 50)"
                     style={{ transition: 'stroke-dashoffset 0.1s linear' }}
                   />

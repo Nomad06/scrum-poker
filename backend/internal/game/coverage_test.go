@@ -52,7 +52,7 @@ func TestRoom_GetSetScale(t *testing.T) {
 }
 
 func TestHub_Cleanup(t *testing.T) {
-	hub := NewHub(1)
+	hub := NewHub(1, nil)
 	defer hub.Stop()
 
 	// Create room and expire it

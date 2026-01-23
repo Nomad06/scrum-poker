@@ -61,6 +61,15 @@ func (h *WebSocketHandler) HandleConnection(c *gin.Context) {
 		conn.Close()
 		return
 	}
+
+	// Check if reclaiming host status
+	hostToken := c.Query("hostToken")
+	if hostToken != "" {
+		if room.ClaimHost(playerID, hostToken) {
+			log.Printf("Player %s reclaimed host status in room %s", playerName, roomCode)
+		}
+	}
+
 	log.Printf("Player %s (%s) joined room %s", playerName, playerID, roomCode)
 
 	// Send initial state to the joining player
@@ -130,6 +139,9 @@ func (h *WebSocketHandler) processMessage(player *game.Player, room *game.Room, 
 
 	case models.MsgTypeStopTimer:
 		h.handleStopTimer(player, room)
+
+	case models.MsgTypeSetIssue:
+		h.handleSetIssue(player, room, msg.Issue)
 
 	default:
 		log.Printf("Unknown message type: '%s'", msg.Type)
@@ -308,6 +320,23 @@ func (h *WebSocketHandler) handleStopTimer(player *game.Player, room *game.Room)
 		player.SendMessage(&models.ServerMessage{
 			Type:  models.MsgTypeError,
 			Error: "only the host can stop the timer",
+		})
+	}
+}
+
+// handleSetIssue handles setting the current Jira issue
+func (h *WebSocketHandler) handleSetIssue(player *game.Player, room *game.Room, issue *models.JiraIssue) {
+	if room.SetIssue(player.ID, issue) {
+		// Broadcast new state to all (or just payload with issue? Sync is safer)
+		// For now simple sync
+		for _, p := range room.Players {
+			h.sendState(p, room)
+		}
+		log.Printf("Issue set in room %s by %s: %s", room.Code, player.Name, issue.Key)
+	} else {
+		player.SendMessage(&models.ServerMessage{
+			Type:  models.MsgTypeError,
+			Error: "only the host can set the issue",
 		})
 	}
 }

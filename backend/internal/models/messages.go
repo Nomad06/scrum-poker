@@ -22,7 +22,14 @@ const (
 	MsgTypeResetDone  MessageType = "reset_done"
 	MsgTypeTimerSync  MessageType = "timer_sync"
 	MsgTypeTimerEnd   MessageType = "timer_end"
+	MsgTypeSetIssue   MessageType = "set_issue"
 )
+
+// JiraIssue represents an issue being estimated
+type JiraIssue struct {
+	Key     string `json:"key"`
+	Summary string `json:"summary"`
+}
 
 // VotingScaleType represents different voting scale presets
 type VotingScaleType string
@@ -68,6 +75,7 @@ type ClientMessage struct {
 	Vote          string      `json:"vote,omitempty"`
 	TimerDuration int         `json:"timerDuration,omitempty"` // Duration in seconds
 	AutoReveal    bool        `json:"autoReveal,omitempty"`    // Auto-reveal when timer ends
+	Issue         *JiraIssue  `json:"issue,omitempty"`
 }
 
 // ServerMessage represents a message from server to client
@@ -97,6 +105,7 @@ type RoomState struct {
 	Scale           *VotingScale `json:"scale"`
 	TimerEndTime    *int64       `json:"timerEndTime,omitempty"` // Unix timestamp in milliseconds
 	TimerAutoReveal bool         `json:"timerAutoReveal"`
+	CurrentIssue    *JiraIssue   `json:"currentIssue,omitempty"`
 }
 
 // TimerState represents the timer state broadcast to clients

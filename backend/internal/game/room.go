@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/poker/backend/internal/models"
 )
 
@@ -15,12 +16,14 @@ type Room struct {
 	Players         map[string]*Player
 	Revealed        bool
 	HostID          string
+	HostToken       string
 	CreatedAt       time.Time
 	LastActive      time.Time
 	ExpiryHours     int
 	Scale           *models.VotingScale
 	TimerEndTime    *time.Time
 	TimerAutoReveal bool
+	CurrentIssue    *models.JiraIssue
 	timerCancel     chan struct{}
 	mu              sync.RWMutex
 	usedAvatars     map[string]bool
@@ -34,6 +37,7 @@ func NewRoom(code string, expiryHours int) *Room {
 		Code:        code,
 		Players:     make(map[string]*Player),
 		Revealed:    false,
+		HostToken:   uuid.New().String(),
 		CreatedAt:   time.Now(),
 		LastActive:  time.Now(),
 		ExpiryHours: expiryHours,
@@ -54,11 +58,51 @@ func NewRoomWithScale(code string, expiryHours int, scaleType models.VotingScale
 		Code:        code,
 		Players:     make(map[string]*Player),
 		Revealed:    false,
+		HostToken:   uuid.New().String(),
 		CreatedAt:   time.Now(),
 		LastActive:  time.Now(),
 		ExpiryHours: expiryHours,
 		Scale:       &scale,
 		usedAvatars: make(map[string]bool),
+	}
+}
+
+// RestoreRoom reconstructs a room from persistence fields
+func RestoreRoom(
+	code, hostID, hostToken string,
+	createdAt, lastActive time.Time,
+	expiryHours int,
+	scale *models.VotingScale,
+	timerEndTime *time.Time,
+	timerAutoReveal, revealed bool,
+	currentIssue *models.JiraIssue,
+) *Room {
+	return &Room{
+		Code:            code,
+		Players:         make(map[string]*Player),
+		Revealed:        revealed,
+		HostID:          hostID,
+		HostToken:       hostToken,
+		CreatedAt:       createdAt,
+		LastActive:      lastActive,
+		ExpiryHours:     expiryHours,
+		Scale:           scale,
+		TimerEndTime:    timerEndTime,
+		TimerAutoReveal: timerAutoReveal,
+		CurrentIssue:    currentIssue,
+		usedAvatars:     make(map[string]bool),
+	}
+}
+
+// RestorePlayer adds a restored player to the room
+func (r *Room) RestorePlayer(player *Player) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.Players[player.ID] = player
+	player.Room = r
+	if player.Avatar != "" {
+		r.usedAvatars[player.Avatar] = true
 	}
 }
 
@@ -109,6 +153,28 @@ func (r *Room) RemovePlayer(playerID string) {
 		}
 	}
 	r.LastActive = time.Now()
+}
+
+// ClaimHost attempts to claim host status using a token
+func (r *Room) ClaimHost(playerID, token string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if token != "" && token == r.HostToken {
+		// Demote current host if exists
+		if currHost, ok := r.Players[r.HostID]; ok {
+			currHost.IsHost = false
+		}
+
+		// Promote new host
+		if p, ok := r.Players[playerID]; ok {
+			p.IsHost = true
+			r.HostID = playerID
+			r.LastActive = time.Now()
+			return true
+		}
+	}
+	return false
 }
 
 // GetPlayer returns a player by ID
@@ -190,6 +256,7 @@ func (r *Room) GetState(forPlayerID string) *models.RoomState {
 		HostID:          r.HostID,
 		Scale:           r.Scale,
 		TimerAutoReveal: r.TimerAutoReveal,
+		CurrentIssue:    r.CurrentIssue,
 	}
 
 	// Include timer end time if active
@@ -334,6 +401,21 @@ func (r *Room) ClearTimer() {
 	defer r.mu.Unlock()
 	r.TimerEndTime = nil
 	r.timerCancel = nil
+}
+
+// SetIssue sets the current Jira issue (host only)
+func (r *Room) SetIssue(playerID string, issue *models.JiraIssue) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Only host can set issue
+	if r.HostID != playerID {
+		return false
+	}
+
+	r.CurrentIssue = issue
+	r.LastActive = time.Now()
+	return true
 }
 
 // GetScale returns the room's voting scale

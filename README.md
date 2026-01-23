@@ -126,7 +126,7 @@ Connect to `/ws?room=CODE&name=NAME`
 
 ## Roadmap
 
-- [ ] **Iteration 2**: Custom voting scales, timer, improved animations
+- [x] **Iteration 2**: Custom voting scales, timer, improved animations
 - [ ] **Iteration 3**: Optional authentication, persistent rooms
 - [ ] **Iteration 4**: Jira/Slack integrations
 - [ ] Sound effects

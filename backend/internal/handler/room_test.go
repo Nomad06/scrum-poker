@@ -15,7 +15,7 @@ import (
 
 func setupTestRouter() (*gin.Engine, *game.Hub) {
 	gin.SetMode(gin.TestMode)
-	hub := game.NewHub(24)
+	hub := game.NewHub(24, nil)
 	handler := NewRoomHandler(hub)
 	r := gin.New()
 

@@ -14,7 +14,8 @@ export type MessageType =
   | 'revealed'
   | 'reset_done'
   | 'timer_sync'
-  | 'timer_end';
+  | 'timer_end'
+  | 'set_issue';
 
 // Voting scale types
 export type VotingScaleType = 'fibonacci' | 'tshirt' | 'powers2' | 'custom';
@@ -43,6 +44,7 @@ export interface RoomState {
   scale?: VotingScale;
   timerEndTime?: number; // Unix timestamp in milliseconds
   timerAutoReveal?: boolean;
+  currentIssue?: JiraIssue;
 }
 
 export interface TimerState {
@@ -63,6 +65,7 @@ export interface ClientMessage {
   vote?: string;
   timerDuration?: number;
   autoReveal?: boolean;
+  issue?: JiraIssue;
 }
 
 export interface ServerMessage {
@@ -85,6 +88,12 @@ export type AvatarType =
 // Default voting card values (Fibonacci) - kept for backward compatibility
 export const VOTING_VALUES = ['1', '2', '3', '5', '8', '13', '21', '?'] as const;
 export type VotingValue = (typeof VOTING_VALUES)[number];
+
+// Jira types
+export interface JiraIssue {
+  key: string;
+  summary: string;
+}
 
 // Preset scales for frontend use
 export const PRESET_SCALES: Record<VotingScaleType, VotingScale> = {

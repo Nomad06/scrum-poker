@@ -53,6 +53,7 @@ func (h *RoomHandler) CreateRoom(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"code":        room.Code,
+		"hostToken":   room.HostToken,
 		"expiryHours": room.ExpiryHours,
 		"scale":       room.Scale,
 	})

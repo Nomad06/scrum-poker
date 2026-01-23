@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { PRESET_SCALES, type VotingScaleType } from '../types';
@@ -13,6 +13,18 @@ export function Home() {
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'initial' | 'create' | 'join'>('initial');
+  const [recentRooms, setRecentRooms] = useState<string[]>([]);
+
+  useEffect(() => {
+    const rooms: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('scrum_poker_token_')) {
+        rooms.push(key.replace('scrum_poker_token_', ''));
+      }
+    }
+    setRecentRooms(rooms);
+  }, []);
 
   const createRoom = async () => {
     if (!playerName.trim()) {
@@ -32,6 +44,12 @@ export function Home() {
       if (!response.ok) throw new Error('Failed to create room');
 
       const data = await response.json();
+
+      // Store host token for persistence
+      if (data.hostToken) {
+        localStorage.setItem(`scrum_poker_token_${data.code}`, data.hostToken);
+      }
+
       navigate(`/room/${data.code}?name=${encodeURIComponent(playerName.trim())}`);
     } catch {
       setError('Failed to create room. Try again!');
@@ -153,6 +171,24 @@ export function Home() {
             >
               Join a Game
             </button>
+
+            {/* Recent Rooms */}
+            {recentRooms.length > 0 && (
+              <div className="mt-6 border-t border-wood-300 pt-4 w-full">
+                <h3 className="text-wood-700 font-semibold mb-2 text-center text-sm uppercase tracking-wider">Your Games</h3>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {recentRooms.map(code => (
+                    <button
+                      key={code}
+                      onClick={() => { setJoinCode(code); setMode('join'); }}
+                      className="w-full bg-sand-100 hover:bg-sand-200 text-wood-800 p-2 rounded text-sm font-mono tracking-widest border border-wood-300 transition-colors"
+                    >
+                      {code}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -191,10 +227,9 @@ export function Home() {
                       onClick={() => setSelectedScale(scaleType)}
                       className={`
                         p-2 rounded-lg border-2 text-sm font-medium transition-all
-                        ${
-                          selectedScale === scaleType
-                            ? 'border-leather-500 bg-leather-100 text-leather-800'
-                            : 'border-wood-300 bg-sand-100 text-wood-700 hover:border-wood-400'
+                        ${selectedScale === scaleType
+                          ? 'border-leather-500 bg-leather-100 text-leather-800'
+                          : 'border-wood-300 bg-sand-100 text-wood-700 hover:border-wood-400'
                         }
                       `}
                     >

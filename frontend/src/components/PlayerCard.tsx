@@ -9,9 +9,10 @@ interface PlayerCardProps {
   isCurrentPlayer?: boolean;
   revealed?: boolean;
   isSuspicious?: boolean;
+  isFiring?: boolean;
 }
 
-export function PlayerCard({ player, isCurrentPlayer = false, revealed = false, isSuspicious = false }: PlayerCardProps) {
+export function PlayerCard({ player, isCurrentPlayer = false, revealed = false, isSuspicious = false, isFiring = false }: PlayerCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.8, y: 20 }}
@@ -29,6 +30,7 @@ export function PlayerCard({ player, isCurrentPlayer = false, revealed = false, 
         hasVoted={player.hasVoted}
         isVoting={!player.hasVoted && !revealed}
         isSuspicious={isSuspicious}
+        isFiring={isFiring}
       />
 
       {/* Name and role */}

@@ -28,7 +28,7 @@ const sizeClasses = {
   lg: 'w-28 h-28',
 };
 
-export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = false, isCelebrating = false, isSuspicious = false }: CowboyAvatarProps) {
+export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = false, isCelebrating = false, isSuspicious = false, isFiring = false }: CowboyAvatarProps & { isFiring?: boolean }) {
   // Extract base type (remove any suffix like "-123")
   const baseType = type.split('-')[0];
   const colors = avatarColors[baseType] || avatarColors.sheriff;
@@ -87,6 +87,9 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
         repeat: 3,
       },
     },
+    firing: {
+      x: 0,
+    }
   };
 
   // Hat tip animation when voted
@@ -107,6 +110,11 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
         repeat: 2,
       },
     },
+    firing: {
+      rotate: [0, -5, 0],
+      y: [0, -2, 0],
+      transition: { duration: 0.2, repeat: 5 }
+    }
   };
 
   // Body bounce for celebration
@@ -122,13 +130,60 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
         repeat: 4,
       },
     },
+    firing: {
+      y: [0, 2, 0], // Recoil from firing
+      transition: {
+        duration: 0.2,
+        repeat: 5,
+      }
+    }
   };
 
-  const animationState = isCelebrating ? 'celebrating' : isVoting ? 'voting' : isSuspicious ? 'suspicious' : hasVoted ? 'voted' : 'idle';
+  // Gun animation - firing UP into the air
+  const gunVariants: Variants = {
+    hidden: {
+      opacity: 0,
+      rotate: 0,
+      x: 0,
+      y: 10
+    },
+    firing: {
+      opacity: 1,
+      rotate: [0, -15, 0], // Recoil when firing up
+      x: 0,
+      y: 0,
+      transition: {
+        duration: 0.2, // Quick draw
+        rotate: {
+          from: 0,
+          duration: 0.15,
+          repeat: 6,
+          repeatType: "reverse"
+        }
+      }
+    }
+  };
+
+  // Muzzle flash animation
+  const flashVariants: Variants = {
+    hidden: { opacity: 0, scale: 0 },
+    firing: {
+      opacity: [0, 1, 0, 1, 0],
+      scale: [0.8, 1.2, 0.8],
+      rotate: [0, 45, 90], // Rotate the star
+      transition: {
+        duration: 0.15,
+        repeat: 6,
+        repeatDelay: 0.05
+      }
+    }
+  };
+
+  const animationState = isFiring ? 'firing' : isCelebrating ? 'celebrating' : isVoting ? 'voting' : isSuspicious ? 'suspicious' : hasVoted ? 'voted' : 'idle';
 
   return (
     <motion.div className={`${sizeClasses[size]} relative`} variants={bodyVariants} animate={animationState}>
-      <svg viewBox="0 0 100 100" className="w-full h-full">
+      <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible">
         {/* Face */}
         <ellipse cx="50" cy="58" rx="28" ry="32" fill={colors.face} />
 
@@ -190,13 +245,13 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
 
           {/* Eyebrows - raised when celebrating */}
           <path
-            d={isCelebrating ? "M 33 44 Q 40 41 47 44" : isSuspicious ? "M 33 49 Q 40 50 47 49" : "M 33 47 Q 40 44 47 47"}
+            d={isCelebrating || isFiring ? "M 33 44 Q 40 41 47 44" : isSuspicious ? "M 33 49 Q 40 50 47 49" : "M 33 47 Q 40 44 47 47"}
             stroke="#5c4033"
             strokeWidth="2"
             fill="none"
           />
           <path
-            d={isCelebrating ? "M 53 44 Q 60 41 67 44" : isSuspicious ? "M 53 49 Q 60 50 67 49" : "M 53 47 Q 60 44 67 47"}
+            d={isCelebrating || isFiring ? "M 53 44 Q 60 41 67 44" : isSuspicious ? "M 53 49 Q 60 50 67 49" : "M 53 47 Q 60 44 67 47"}
             stroke="#5c4033"
             strokeWidth="2"
             fill="none"
@@ -207,8 +262,8 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
         <ellipse cx="50" cy="60" rx="4" ry="3" fill={`${colors.face}dd`} />
 
         {/* Mouth */}
-        {isCelebrating ? (
-          // Big smile when celebrating
+        {isCelebrating || isFiring ? (
+          // Big smile when celebrating/firing
           <path d="M 40 66 Q 50 78 60 66" stroke="#5c4033" strokeWidth="2" fill="none" />
         ) : hasVoted ? (
           // Slight smirk when voted
@@ -222,15 +277,96 @@ export function CowboyAvatar({ type, size = 'md', isVoting = false, hasVoted = f
         {(baseType === 'outlaw' || baseType === 'prospector' || baseType === 'bounty-hunter') && (
           <g fill="#5c4033" opacity="0.3">
             {[...Array(12)].map((_, i) => (
+              // Deterministic positions based on index
               <circle
                 key={i}
-                cx={38 + (i % 4) * 8 + Math.random() * 4}
+                cx={38 + (i % 4) * 8}
                 cy={72 + Math.floor(i / 4) * 4}
                 r="0.5"
               />
             ))}
           </g>
         )}
+
+        {/* Right Revolver - Firing UP */}
+        <motion.g
+          variants={gunVariants}
+          initial="hidden"
+          animate={isFiring ? "firing" : "hidden"}
+          style={{ originX: 0.9, originY: 0.9 }} // Pivot from the hand
+        >
+          {/* Arm */}
+          <path d="M 75 70 Q 100 70 105 55" stroke={colors.face} strokeWidth="6" fill="none" />
+
+          {/* Hand holding the gun */}
+          <circle cx="105" cy="55" r="5" fill={colors.face} />
+
+          {/* Revolver Group - Rotated to point up */}
+          <g transform="translate(105, 55) rotate(-80)">
+            {/* Grip (hidden behind hand mostly, but visible bottom) */}
+            <path d="M 0 0 L 5 12 L 15 12 L 12 0 Z" fill="#8b4513" stroke="#5c2e0e" strokeWidth="1" />
+
+            {/* Body/Cylinder */}
+            <rect x="8" y="-14" width="20" height="14" fill="#4a4a4a" rx="2" />
+            <circle cx="18" cy="-7" r="5" fill="#2d2d2d" />
+            <circle cx="18" cy="-7" r="2" fill="#1a1a1a" />
+
+            {/* Barrel */}
+            <rect x="25" y="-12" width="22" height="6" fill="#2d2d2d" />
+            <rect x="45" y="-14" width="2" height="4" fill="#1a1a1a" /> {/* Sight */}
+
+            {/* Muzzle Flash - EXPLOSIVE */}
+            <motion.path
+              d="M 48 -9 L 58 -18 L 54 -9 L 68 -9 L 54 -3 L 58 6 L 48 -3 Z"
+              fill="#ffd700"
+              stroke="#ff4500"
+              strokeWidth="2"
+              variants={flashVariants}
+            />
+          </g>
+        </motion.g>
+
+        {/* Left Revolver - Firing UP (Mirrored) */}
+        <g transform="translate(100, 0) scale(-1, 1)">
+          <motion.g
+            variants={gunVariants}
+            initial="hidden"
+            animate={isFiring ? "firing" : "hidden"}
+            style={{ originX: 0.9, originY: 0.9 }} // Pivot from the hand (same as right gun as we are mirroring the whole space)
+          >
+            {/* Same content as Right Gun, but globally mirrored */}
+            {/* Arm */}
+            <path d="M 75 70 Q 100 70 105 55" stroke={colors.face} strokeWidth="6" fill="none" />
+
+            {/* Hand holding the gun */}
+            <circle cx="105" cy="55" r="5" fill={colors.face} />
+
+            {/* Revolver Group - Rotated to point up */}
+            <g transform="translate(105, 55) rotate(-80)">
+              {/* Grip (hidden behind hand mostly, but visible bottom) */}
+              <path d="M 0 0 L 5 12 L 15 12 L 12 0 Z" fill="#8b4513" stroke="#5c2e0e" strokeWidth="1" />
+
+              {/* Body/Cylinder */}
+              <rect x="8" y="-14" width="20" height="14" fill="#4a4a4a" rx="2" />
+              <circle cx="18" cy="-7" r="5" fill="#2d2d2d" />
+              <circle cx="18" cy="-7" r="2" fill="#1a1a1a" />
+
+              {/* Barrel */}
+              <rect x="25" y="-12" width="22" height="6" fill="#2d2d2d" />
+              <rect x="45" y="-14" width="2" height="4" fill="#1a1a1a" /> {/* Sight */}
+
+              {/* Muzzle Flash - EXPLOSIVE */}
+              <motion.path
+                d="M 48 -9 L 58 -18 L 54 -9 L 68 -9 L 54 -3 L 58 6 L 48 -3 Z"
+                fill="#ffd700"
+                stroke="#ff4500"
+                strokeWidth="2"
+                variants={flashVariants}
+              />
+            </g>
+          </motion.g>
+        </g>
+
       </svg>
 
       {/* Voted indicator */}

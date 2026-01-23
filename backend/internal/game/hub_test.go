@@ -10,7 +10,7 @@ import (
 
 func TestHub_MaxRooms(t *testing.T) {
 	// Create a hub
-	hub := NewHub(24)
+	hub := NewHub(24, nil)
 	defer hub.Stop()
 
 	// Fill the hub to the limit (MaxRooms = 1000)
@@ -39,7 +39,7 @@ func TestHub_MaxRooms(t *testing.T) {
 }
 
 func TestHub_CreateRoomWithScale(t *testing.T) {
-	hub := NewHub(24)
+	hub := NewHub(24, nil)
 	defer hub.Stop()
 
 	// Test default scale creation (via CreateRoom)
@@ -67,7 +67,7 @@ func TestHub_CreateRoomWithScale(t *testing.T) {
 }
 
 func TestHub_GetRoom(t *testing.T) {
-	hub := NewHub(24)
+	hub := NewHub(24, nil)
 	defer hub.Stop()
 
 	room := hub.CreateRoom(1)
@@ -88,7 +88,7 @@ func TestHub_GetRoom(t *testing.T) {
 }
 
 func TestHub_DeleteRoom(t *testing.T) {
-	hub := NewHub(24)
+	hub := NewHub(24, nil)
 	defer hub.Stop()
 
 	room := hub.CreateRoom(1)
@@ -118,7 +118,7 @@ func TestHub_ScheduleDeleteIfEmpty(t *testing.T) {
 	// I can edit hub.go.
 
 	// Better approach for now: Test Stats which is simpler and covers ready state.
-	hub := NewHub(24)
+	hub := NewHub(24, nil)
 	defer hub.Stop()
 
 	hub.CreateRoom(1)

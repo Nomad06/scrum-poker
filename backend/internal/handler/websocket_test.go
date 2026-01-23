@@ -151,10 +151,10 @@ func TestWebSocketHandler_Reveal_Reset(t *testing.T) {
 	defer ws2.Close()
 	ws2.ReadJSON(&ignore)
 
-	// Host receives player_joined
+	// Host receives sync (new player joined triggers sync)
 	var joinMsg models.ServerMessage
 	ws.ReadJSON(&joinMsg)
-	assert.Equal(t, models.MsgTypePlayerJoin, joinMsg.Type)
+	assert.Equal(t, models.MsgTypeSync, joinMsg.Type)
 
 	// Guest tries to reveal (should fail or error)
 	ws2.WriteJSON(models.ClientMessage{Type: models.MsgTypeReveal})

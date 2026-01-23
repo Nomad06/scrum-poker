@@ -16,21 +16,44 @@ const (
 	MaxRooms             = 1000
 )
 
+// RoomRepository defines the interface for room persistence
+type RoomRepository interface {
+	SaveRoom(room *Room) error
+	GetRoom(code string) (*Room, error)
+	DeleteRoom(code string) error
+	GetAllRooms() ([]*Room, error)
+}
+
 // Hub manages all rooms and connections
 type Hub struct {
 	Rooms         map[string]*Room
 	DefaultExpiry int // hours
+	repo          RoomRepository
 	mu            sync.RWMutex
 	cleanupTicker *time.Ticker
 	done          chan struct{}
 }
 
 // NewHub creates a new hub
-func NewHub(defaultExpiryHours int) *Hub {
+func NewHub(defaultExpiryHours int, repo RoomRepository) *Hub {
 	h := &Hub{
 		Rooms:         make(map[string]*Room),
 		DefaultExpiry: defaultExpiryHours,
+		repo:          repo,
 		done:          make(chan struct{}),
+	}
+
+	// Load existing rooms
+	if repo != nil {
+		rooms, err := repo.GetAllRooms()
+		if err != nil {
+			log.Printf("Error loading rooms from DB: %v", err)
+		} else {
+			for _, r := range rooms {
+				h.Rooms[r.Code] = r
+				log.Printf("Loaded room %s from DB", r.Code)
+			}
+		}
 	}
 
 	// Start cleanup routine
@@ -63,8 +86,23 @@ func (h *Hub) CreateRoomWithScale(expiryHours int, scaleType models.VotingScaleT
 	room := NewRoomWithScale(code, expiryHours, scaleType)
 	h.Rooms[code] = room
 
+	if h.repo != nil {
+		if err := h.repo.SaveRoom(room); err != nil {
+			log.Printf("Error saving new room %s: %v", code, err)
+		}
+	}
+
 	log.Printf("Room created: %s (expires in %d hours, scale: %s)", code, expiryHours, scaleType)
 	return room
+}
+
+// SaveRoom saves the room state (for updates)
+func (h *Hub) SaveRoom(room *Room) {
+	if h.repo != nil {
+		if err := h.repo.SaveRoom(room); err != nil {
+			log.Printf("Error saving room %s: %v", room.Code, err)
+		}
+	}
 }
 
 // GetRoom returns a room by code
@@ -79,6 +117,9 @@ func (h *Hub) DeleteRoom(code string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	delete(h.Rooms, code)
+	if h.repo != nil {
+		h.repo.DeleteRoom(code)
+	}
 	log.Printf("Room deleted: %s", code)
 }
 
@@ -91,6 +132,9 @@ func (h *Hub) ScheduleDeleteIfEmpty(code string) {
 
 		if room, exists := h.Rooms[code]; exists && room.IsEmpty() {
 			delete(h.Rooms, code)
+			if h.repo != nil {
+				h.repo.DeleteRoom(code)
+			}
 			log.Printf("Room deleted after grace period: %s", code)
 		}
 	}()
@@ -131,6 +175,9 @@ func (h *Hub) cleanup() {
 	for code, room := range h.Rooms {
 		if room.IsEmpty() || room.IsExpired() {
 			delete(h.Rooms, code)
+			if h.repo != nil {
+				h.repo.DeleteRoom(code)
+			}
 			log.Printf("Room cleaned up: %s (empty: %v, expired: %v)",
 				code, room.IsEmpty(), room.IsExpired())
 		}
